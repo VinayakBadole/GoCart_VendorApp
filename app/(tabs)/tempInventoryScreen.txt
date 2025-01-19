@@ -1,0 +1,130 @@
+// import React, { useState } from 'react';
+// import { View, Text, FlatList, StyleSheet, Button, Modal, TouchableOpacity, Image } from 'react-native';
+// import { availableVegetables, inventory as initialInventory } from './vegetablesData.js';
+
+// interface InventoryItem {
+//   id: number;
+//   vegetable: string;
+//   quantity: number;
+//   image: string;
+// }
+
+// const InventoryScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+//   const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory);
+//   const [isModalVisible, setIsModalVisible] = useState(false);
+//   const [selectedVegetable, setSelectedVegetable] = useState<InventoryItem | null>(null);
+//   const [quantity, setQuantity] = useState(1);
+
+//   const modifyQuantity = (id: number, delta: number) => {
+//     setInventory(inventory.map(item => 
+//       item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item
+//     ));
+//   };
+
+//   const removeVegetable = (id: number) => {
+//     setInventory(inventory.filter(item => item.id !== id));
+//   };
+
+//   const addVegetableToInventory = () => {
+//     if (selectedVegetable) {
+//       const existingItem = inventory.find(item => item.id === selectedVegetable.id);
+//       if (existingItem) {
+//         setInventory(inventory.map(item => 
+//           item.id === selectedVegetable.id
+//             ? { ...item, quantity: item.quantity + quantity }
+//             : item
+//         ));
+//       } else {
+//         const vegetableToAdd = { ...selectedVegetable, quantity };
+//         setInventory([...inventory, vegetableToAdd]);
+//       }
+//       setIsModalVisible(false);
+//       setQuantity(1);
+//     }
+//   };
+
+//   const renderInventoryItem = ({ item }: { item: InventoryItem }) => (
+//     <View style={styles.inventoryItem}>
+//       <Image source={{ uri: item.image }} style={styles.vegetableImage} />
+//       <View style={styles.itemInfo}>
+//         <Text style={styles.text}><Text style={styles.boldText}>Vegetable:</Text> {item.vegetable}</Text>
+//         <View style={styles.quantityControls}>
+//           <Button title="-" onPress={() => modifyQuantity(item.id, -1)} />
+//           <Text style={styles.quantityText}>{item.quantity} Rs/kg</Text>
+//           <Button title="+" onPress={() => modifyQuantity(item.id, 1)} />
+//         </View>
+//       </View>
+//       <View style={styles.removeButtonContainer}>
+//         <Button title="Remove" onPress={() => removeVegetable(item.id)} color="red" />
+//       </View>
+//     </View>
+//   );
+
+//   const renderVegetableOption = ({ item }: { item: InventoryItem }) => (
+//     <TouchableOpacity onPress={() => setSelectedVegetable(item)}>
+//       <View style={styles.vegetableOption}>
+//         <Image source={{ uri: item.image }} style={styles.vegetableImage} />
+//         <Text style={styles.text}>{item.vegetable}</Text>
+//       </View>
+//     </TouchableOpacity>
+//   );
+
+//   return (
+//     <View style={styles.container}>
+//       <Text style={styles.header}>Today's Inventory</Text>
+//       <View style={styles.buttonContainer}>
+//         <Button title="Add Vegetable" onPress={() => setIsModalVisible(true)} />
+//       </View>
+//       <FlatList
+//         data={inventory}
+//         renderItem={renderInventoryItem}
+//         keyExtractor={item => item.id.toString()}
+//       />
+//       <Modal
+//         visible={isModalVisible}
+//         transparent={true}
+//         animationType="slide"
+//         onRequestClose={() => {
+//           setIsModalVisible(false);
+//           setQuantity(1);
+//         }}
+//       >
+//         <View style={styles.modalContainer}>
+//           <View style={styles.modalContent}>
+//             <Text style={styles.modalHeader}>Select a Vegetable and Quantity</Text>
+//             {!selectedVegetable && (
+//               <FlatList
+//                 data={availableVegetables}
+//                 renderItem={renderVegetableOption}
+//                 keyExtractor={item => item.id.toString()}
+//               />
+//             )}
+//             {selectedVegetable && (
+//               <View>
+//                 <Text style={styles.selectedVegetableText}>Selected: {selectedVegetable.vegetable}</Text>
+//                 <View style={styles.quantityContainer}>
+//                   <Button title="-" onPress={() => setQuantity(Math.max(1, quantity - 1))} />
+//                   <Text style={styles.quantityText}>{quantity} Rs/kg</Text>
+//                   <Button title="+" onPress={() => setQuantity(quantity + 1)} />
+//                 </View>
+//                 <View style={styles.modalButtonList}>
+//                   <Button title="Add to Inventory" onPress={addVegetableToInventory} />
+//                   <Button title="Cancel" onPress={() => setIsModalVisible(false)} />
+//                 </View>
+//               </View>
+//             )}
+//           </View>
+//         </View>
+//       </Modal>
+//     </View>
+//   );
+// };
+
+// const styles = StyleSheet.create({
+//   // Styles remain the same as provided earlier
+// });
+
+// export default InventoryScreen;
+
+
+

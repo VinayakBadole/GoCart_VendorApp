@@ -1,0 +1,311 @@
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  Button,
+  Modal,
+  TouchableOpacity,
+  Image,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
+import { db } from "../../firebaseConfig.js";
+import { collection, query, where, getDocs, updateDoc, arrayUnion, onSnapshot } from "firebase/firestore";
+
+interface InventoryItem {
+  id: string;
+  vegetable: string;
+  price: string;
+  unit: string;
+  image: string;
+}
+
+const InventoryScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [availableVegetables, setAvailableVegetables] = useState<InventoryItem[]>([]);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [selectedVegetable, setSelectedVegetable] = useState<InventoryItem | null>(null);
+  const [price, setPrice] = useState('');
+  const [unit, setUnit] = useState('');
+  const [loading, setLoading] = useState(false); // Loader state
+  const [searchQuery, setSearchQuery] = useState(''); // Search query state
+
+  useEffect(() => {
+    const loadInventory = async () => {
+      const vendorQuery = query(collection(db, "vendors"), where("ContactNo", "==", "1122334455"));
+      try {
+        const querySnapshot = await getDocs(vendorQuery);
+        if (!querySnapshot.empty) {
+          const vendorData = querySnapshot.docs[0].data();
+          const vendorVegetables = vendorData.vegetables || [];
+          setInventory(vendorVegetables);
+        } else {
+          console.error("Vendor with specified ContactNo not found!");
+        }
+      } catch (error) {
+        console.error("Error fetching inventory: ", error);
+      }
+    };
+
+    loadInventory();
+  }, []);
+
+  useEffect(() => {
+    const vegetableCollection = collection(db, 'vegetableItems');
+    const unsubscribe = onSnapshot(vegetableCollection, (snapshot) => {
+      const vegetables = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        vegetable: doc.data().vegetable,
+        price: '', 
+        unit: doc.data().unit || 'kg',
+        image: doc.data().image,
+      }));
+      setAvailableVegetables(vegetables);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const filteredVegetables = availableVegetables.filter((item) =>
+    item.vegetable.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const updatePrice = async (id: string, newPrice: string) => {
+    setInventory((prevInventory) =>
+      prevInventory.map((item) =>
+        item.id === id ? { ...item, price: newPrice } : item
+      )
+    );
+
+    try {
+      const vendorQuery = query(
+        collection(db, "vendors"),
+        where("ContactNo", "==", "1122334455")
+      );
+      const querySnapshot = await getDocs(vendorQuery);
+
+      if (!querySnapshot.empty) {
+        const vendorDocRef = querySnapshot.docs[0].ref;
+        const vendorData = querySnapshot.docs[0].data();
+        const updatedVegetables = vendorData.vegetables.map((veg: any) =>
+          veg.id === id ? { ...veg, price: newPrice } : veg
+        );
+        await updateDoc(vendorDocRef, { vegetables: updatedVegetables });
+        console.log("Price updated successfully in database");
+      } else {
+        console.error("Vendor document not found!");
+      }
+    } catch (error) {
+      console.error("Error updating price: ", error);
+    }
+  };
+
+  const confirmRemoveVegetable = (id: string) => {
+    Alert.alert(
+      "Confirm Removal",
+      "Are you sure you want to remove this vegetable from your inventory?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Yes",
+          onPress: () => removeVegetable(id)
+        }
+      ]
+    );
+  };
+
+  const removeVegetable = async (id: string) => {
+    setInventory((prevInventory) =>
+      prevInventory.filter((item) => item.id !== id)
+    );
+
+    try {
+      const vendorQuery = query(
+        collection(db, "vendors"),
+        where("ContactNo", "==", "1122334455")
+      );
+      const querySnapshot = await getDocs(vendorQuery);
+
+      if (!querySnapshot.empty) {
+        const vendorDocRef = querySnapshot.docs[0].ref;
+        const vendorData = querySnapshot.docs[0].data();
+        const updatedVegetables = vendorData.vegetables.filter(
+          (veg: any) => veg.id !== id
+        );
+        await updateDoc(vendorDocRef, { vegetables: updatedVegetables });
+        console.log("Vegetable removed successfully from database");
+      } else {
+        console.error("Vendor document not found!");
+      }
+    } catch (error) {
+      console.error("Error removing vegetable: ", error);
+    }
+  };
+
+  const addVegetableToInventory = async () => {
+    if (selectedVegetable) {
+      setLoading(true); // Start loader
+      const vendorQuery = query(collection(db, "vendors"), where("ContactNo", "==", "1122334455"));
+
+      try {
+        const querySnapshot = await getDocs(vendorQuery);
+
+        if (!querySnapshot.empty) {
+          const vendorDocRef = querySnapshot.docs[0].ref;
+          const vendorData = querySnapshot.docs[0].data();
+          const existingVegetables = vendorData.vegetables || [];
+
+          const vegetableExistsInDB = existingVegetables.some(
+            (veg: any) => veg.id === selectedVegetable.id
+          );
+
+          if (vegetableExistsInDB) {
+            alert("This vegetable is already in your inventory!");
+            setLoading(false); // Stop loader
+            return;
+          }
+
+          const vegetableData = {
+            id: selectedVegetable.id ?? "unknown-id", 
+            name: selectedVegetable.vegetable ?? "unknown-name", 
+            price: price ?? 0, 
+            unit: unit ?? "unknown-unit", 
+            image: selectedVegetable.image ?? "",
+          };
+
+          await updateDoc(vendorDocRef, {
+            vegetables: arrayUnion(vegetableData),
+          });
+
+          console.log("Vegetable added successfully to the database");
+
+          const vegetableToAdd = { ...selectedVegetable, price, unit };
+          setInventory([...inventory, vegetableToAdd]);
+
+          setIsModalVisible(false);
+          setPrice("");
+          setUnit("");
+        } else {
+          console.error("Vendor document not found!");
+        }
+      } catch (error) {
+        console.error("Error updating vegetable: ", error);
+      } finally {
+        setLoading(false); // Stop loader
+      }
+    }
+  };
+
+  const renderVegetableOption = ({ item }: { item: InventoryItem }) => (
+    <TouchableOpacity onPress={() => { setSelectedVegetable(item); setUnit(item.unit); }}>
+      <View style={styles.vegetableOption}>
+        <Image source={{ uri: item.image }} style={styles.vegetableImage} />
+        <Text style={styles.text}>{item.vegetable}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.header}>Today's Inventory</Text>
+      <View style={styles.buttonContainer}>
+        <Button
+          title="Add Vegetable"
+          onPress={() => {
+            setSelectedVegetable(null);
+            setIsModalVisible(true);
+          }}
+        />
+      </View>
+      <FlatList
+        data={inventory}
+        renderItem={renderInventoryItem}
+        keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.cardList}
+      />
+      <Modal
+        visible={isModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setIsModalVisible(false);
+          setPrice('');
+          setUnit('');
+        }}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalHeader}>Select a Vegetable and Enter Details</Text>
+
+            {/* Search Bar */}
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search vegetables"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+
+            {!selectedVegetable && (
+              <FlatList
+                data={filteredVegetables}
+                renderItem={renderVegetableOption}
+                keyExtractor={(item) => item.id}
+              />
+            )}
+
+            {selectedVegetable && (
+              <View style={styles.modalForm}>
+                <Text style={styles.selectedVegetableText}>
+                  Selected: {selectedVegetable.vegetable}
+                </Text>
+                <View style={styles.priceRow}>
+                  <TextInput
+                    style={styles.priceInput}
+                    placeholder="Enter Price (Rs)"
+                    keyboardType="numeric"
+                    value={price}
+                    onChangeText={setPrice}
+                  />
+                  <Text style={styles.text}>per {selectedVegetable.unit}</Text>
+                </View>
+                <Button
+                  title={loading ? "Adding..." : "Add Vegetable"}
+                  onPress={addVegetableToInventory}
+                  disabled={loading || !price}
+                />
+              </View>
+            )}
+            <Button title="Close" onPress={() => setIsModalVisible(false)} />
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1, padding: 20 },
+  header: { fontSize: 24, fontWeight: 'bold' },
+  buttonContainer: { marginBottom: 20 },
+  cardList: { marginBottom: 20 },
+  vegetableOption: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  vegetableImage: { width: 50, height: 50, marginRight: 10 },
+  text: { fontSize: 16 },
+  modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalContent: { backgroundColor: 'white', padding: 20, borderRadius: 10, width: '80%' },
+  modalHeader: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
+  searchInput: { height: 40, borderColor: '#ccc', borderWidth: 1, marginBottom: 10, paddingLeft: 10 },
+  modalForm: { marginTop: 10 },
+  selectedVegetableText: { fontSize: 16, fontWeight: 'bold' },
+  priceRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  priceInput: { borderColor: '#ccc', borderWidth: 1, padding: 5, marginRight: 10, width: '60%' },
+});
+
+export default InventoryScreen;

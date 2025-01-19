@@ -1,0 +1,158 @@
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  Button,
+  Modal,
+  TouchableOpacity,
+  Image,
+  TextInput,
+  ActivityIndicator,
+} from 'react-native';
+import { db } from "../../firebaseConfig.js";
+import { collection, query, where, onSnapshot, getDocs, updateDoc, arrayUnion } from "firebase/firestore";
+
+interface InventoryItem {
+  id: string;
+  vegetable: string;
+  price: string;
+  unit: string;
+  image: string;
+}
+
+const InventoryScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [availableVegetables, setAvailableVegetables] = useState<InventoryItem[]>([]);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [selectedVegetable, setSelectedVegetable] = useState<InventoryItem | null>(null);
+  const [price, setPrice] = useState('');
+  const [unit, setUnit] = useState('');
+  const [isLoading, setIsLoading] = useState(false); // Loader state
+
+  useEffect(() => {
+    const vegetableCollection = collection(db, 'vegetableItems');
+    const unsubscribe = onSnapshot(vegetableCollection, (snapshot) => {
+      const vegetables = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        vegetable: doc.data().vegetable,
+        price: '',
+        unit: doc.data().unit || 'kg',
+        image: doc.data().image,
+      }));
+      setAvailableVegetables(vegetables);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const addVegetableToInventory = async () => {
+    if (selectedVegetable) {
+      const existingItem = inventory.find((item) => item.id === selectedVegetable.id);
+      const vendorQuery = query(collection(db, "test"), where("ContactNo", "==", "1122334455"));
+
+      try {
+        setIsLoading(true); // Show loader
+        const querySnapshot = await getDocs(vendorQuery);
+
+        if (!querySnapshot.empty) {
+          const vendorDocRef = querySnapshot.docs[0].ref;
+          const vegetableData = {
+            id: selectedVegetable.id ?? "unknown-id",
+            name: selectedVegetable.vegetable ?? "unknown-name",
+            price: price ?? 0,
+            unit: unit ?? "unknown-unit",
+            image: selectedVegetable.image ?? "",
+          };
+
+          await updateDoc(vendorDocRef, {
+            vegetables: arrayUnion(vegetableData),
+          });
+
+          console.log("Vegetable updated successfully");
+          const vegetableToAdd = { ...selectedVegetable, price, unit };
+          setInventory([...inventory, vegetableToAdd]);
+          setIsModalVisible(false);
+          setPrice("");
+          setUnit("");
+        } else {
+          console.error("Vendor document not found!");
+        }
+      } catch (error) {
+        console.error("Error updating vegetable: ", error);
+      } finally {
+        setIsLoading(false); // Hide loader
+      }
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.header}>Today's Inventory</Text>
+      <View style={styles.buttonContainer}>
+        <Button
+          title="Add Vegetable"
+          onPress={() => {
+            setSelectedVegetable(null);
+            setIsModalVisible(true);
+          }}
+        />
+      </View>
+      <FlatList
+        data={inventory}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <Image source={{ uri: item.image }} style={styles.cardImage} />
+            <View style={styles.cardInfo}>
+              <Text style={styles.cardTitle}>{item.vegetable}</Text>
+            </View>
+          </View>
+        )}
+        keyExtractor={(item) => item.id}
+      />
+      <Modal
+        visible={isModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            {isLoading ? (
+              <ActivityIndicator size="large" color="#0000ff" />
+            ) : (
+              <>
+                <Text style={styles.modalHeader}>Select a Vegetable and Enter Details</Text>
+                <FlatList
+                  data={availableVegetables}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSelectedVegetable(item);
+                        setUnit(item.unit);
+                      }}
+                    >
+                      <View style={styles.vegetableOption}>
+                        <Image source={{ uri: item.image }} style={styles.vegetableImage} />
+                        <Text style={styles.text}>{item.vegetable}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  keyExtractor={(item) => item.id}
+                />
+                <Button title="Add to Inventory" onPress={addVegetableToInventory} />
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  // Your styles remain the same.
+});
+
+export default InventoryScreen;
