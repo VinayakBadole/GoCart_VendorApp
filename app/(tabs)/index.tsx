@@ -37,7 +37,8 @@ interface Order {
 const VendorApp: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [location, setLocation] = useState(null);
-
+  //console.log("inside tabs/index");
+  
 
   // Fetch orders from Firebase
   const fetchOrders = async () => {
@@ -46,7 +47,7 @@ const VendorApp: React.FC = () => {
       const ordersData: Order[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        console.log("Fetched order data:", data); // Log data
+        // console.log("Fetched order data:", data); // Log data
         if (!data.VendorName || typeof data.VendorName !== "string") {
           console.error("Invalid VendorName in order:", data);
         }
